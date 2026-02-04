@@ -49,7 +49,7 @@ function handleFile(file) {
             showStatus('Please select XLSX files only.', 'error');
             return;
         }
-        
+
         updateFileList();
     }
 }
@@ -96,8 +96,8 @@ const requiredColumns = Object.keys(columnMappings);
 
 const allowedDealerCodes = [
     'CC', 'CC1', 'CC2', 'CC6', 'CCD', 'CCD1', 'CD3', 'CD5', 'CD6', 'CD9', 'CEA', 'CEZ',
-    'CE1', 'CE0', 'CE11', 'CPI', 'CSK', 'CSY', 'CSW', 'CSW5', 'CD2', 'CSM', 'CD12', 'DMU', 
-    'DMW', 'DMJ', 'DMC', 'DME', 'CSR1', 'CSW3', 'DMF', 'DMG', 'DMH', 'DMK', 'CE12', 'CT12','CT3'
+    'CE1', 'CE0', 'CE11', 'CPI', 'CSK', 'CSY', 'CSW', 'CSW5', 'CD2', 'CSM', 'CD12', 'DMU',
+    'DMW', 'DMJ', 'DMC', 'DME', 'CSR1', 'CSW3', 'DMF', 'DMG', 'DMH', 'DMK', 'CE12', 'CT12', 'CT3', 'DMS'
 ];
 
 let currentFileIndex = 0;
@@ -108,7 +108,7 @@ function processFile() {
     const fileInput = document.getElementById('fileInput');
     const processButton = document.getElementById('processButton');
     const files = fileInput.files;
-    
+
     if (!files.length) {
         showStatus('Please select at least one file.', 'error');
         return;
@@ -118,7 +118,7 @@ function processFile() {
     totalFiles = files.length;
     processButton.disabled = true;
     processButton.classList.add('loading');
-    
+
     processNextFile();
 }
 
@@ -132,11 +132,11 @@ function processNextFile() {
         processButton.disabled = false;
         processButton.classList.remove('loading');
         document.querySelector('.progress-container').style.display = 'none';
-        
+
         // Generate and display the summary
         let summary = 'All files processed successfully!\n\nDealer Code Summary:';
         const sortedDealerCodes = Object.keys(dealerCodeCounts).sort();
-        
+
         let hasCounts = false;
         sortedDealerCodes.forEach(code => {
             if (dealerCodeCounts[code] > 0) {
@@ -144,17 +144,17 @@ function processNextFile() {
                 summary += `\n${code}: ${dealerCodeCounts[code]} contract${dealerCodeCounts[code] > 1 ? 's' : ''}`;
             }
         });
-        
+
         if (!hasCounts) {
             summary = 'All files processed successfully!\nNo matching contracts found.';
         }
-        
+
         showStatus(summary, 'success');
         return;
     }
 
     updateProgress(currentFileIndex + 1, totalFiles);
-    
+
     // Update file list item status
     const fileItems = document.querySelectorAll('.file-item');
     if (fileItems[currentFileIndex]) {
@@ -166,15 +166,15 @@ function processNextFile() {
 
     const reader = new FileReader();
 
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            
+
             // Get the first sheet
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            
+
             // Convert to JSON
             let jsonData = XLSX.utils.sheet_to_json(worksheet);
 
@@ -188,10 +188,10 @@ function processNextFile() {
                 .filter(row => {
                     const contractNum = row[excelColumnNames.contractNumber];
                     const drCode = row[excelColumnNames.drCode];
-                    
-                    if (contractNum && 
+
+                    if (contractNum &&
                         contractNum.toString().startsWith('CNPG') &&
-                        drCode && 
+                        drCode &&
                         allowedDealerCodes.includes(drCode.toString())) {
                         // Count the dealer codes
                         dealerCodeCounts[drCode.toString()] = (dealerCodeCounts[drCode.toString()] || 0) + 1;
@@ -227,7 +227,7 @@ function processNextFile() {
                 for (let C = range.s.c; C <= range.e.c; ++C) {
                     const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
                     if (!newWorksheet[cell_address]) continue;
-                    
+
                     // Style object for the cell
                     const cellStyle = {
                         border: {
@@ -266,12 +266,12 @@ function processNextFile() {
             XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Filtered Data');
 
             // Modified file name to include iteration number if multiple files
-            const outputFileName = totalFiles > 1 
-                ? `processed_data_${currentFileIndex + 1}.xlsx` 
+            const outputFileName = totalFiles > 1
+                ? `processed_data_${currentFileIndex + 1}.xlsx`
                 : 'processed_data.xlsx';
 
             XLSX.writeFile(newWorkbook, outputFileName);
-            
+
             // Process next file
             currentFileIndex++;
             setTimeout(processNextFile, 100); // Small delay between files
@@ -283,7 +283,7 @@ function processNextFile() {
         }
     };
 
-    reader.onerror = function() {
+    reader.onerror = function () {
         showStatus(`Error reading file ${currentFileIndex + 1} (${file.name})`, 'error');
         processButton.disabled = false;
         processButton.classList.remove('loading');
@@ -299,11 +299,11 @@ function updateProgress(current, total) {
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     const progressContainer = document.querySelector('.progress-container');
-    
+
     if (progressContainer) {
         progressContainer.style.display = 'block';
     }
-    
+
     const percentage = (current / total) * 100;
     progressBar.style.width = `${percentage}%`;
     progressText.textContent = `Processing file ${current} of ${total}`;
@@ -314,7 +314,7 @@ function updateFileList() {
     const filePreview = document.getElementById('filePreview');
     const fileList = document.createElement('div');
     fileList.className = 'file-list';
-    
+
     Array.from(files).forEach((file, index) => {
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item';
@@ -324,13 +324,13 @@ function updateFileList() {
         `;
         fileList.appendChild(fileItem);
     });
-    
+
     // Remove old file list if exists
     const oldFileList = filePreview.querySelector('.file-list');
     if (oldFileList) {
         oldFileList.remove();
     }
-    
+
     filePreview.style.display = 'block';
     filePreview.appendChild(fileList);
     document.getElementById('processButton').disabled = files.length === 0;
