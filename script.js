@@ -60,39 +60,63 @@ function showStatus(message, type = '') {
     statusDiv.className = 'status ' + type;
 }
 
-// Existing column mappings and configurations
-// Maps Excel column names to output column names
-const excelColumnNames = {
-    'drCode': 'DR Code',
-    'contractNumber': 'Contract Number',
-    'clientCode': 'Client Code',
-    'clientName': 'Client Name',
-    'counterCode': 'Counter Code',
-    'counterName': 'Counter Name',
-    'tradedCurrency': 'Traded Currency',
-    'quantity': 'Quantity',
-    'tradedPrice': 'Price',
-    'netAmountTradedCcy': 'Net Amount Traded CCY',
-    'netAmountBaseCcy': 'Net Amount Base CCY',
-    'exchangeRate': 'Exchange Rate'
+// Ordered source → output column mappings (output column order is preserved)
+const columnMappings = [
+    { source: 'DR code', output: 'DR Code' },
+    { source: 'Cnt No', output: 'Contract No.' },
+    { source: 'Action', output: 'Action' },
+    { source: 'Name', output: 'Client Name' },
+    { source: 'Code', output: 'Client Code' },
+    { source: 'Counter', output: 'Counter' },
+    { source: 'Qty', output: 'Quantity' },
+    { source: 'Buy Price', output: 'Price' },
+    { source: 'CCY', output: 'Traded Currency' },
+    { source: 'Amount (traded)', output: 'Contract Value' },
+    { source: 'CCY (Sett)', output: 'Settlement Currency' }
+];
+
+const ACTION_STYLES = {
+    'due today': {
+        fill: 'FFEB9C', // Excel Neutral fill
+        font: '9C6500'  // Excel Neutral font
+    },
+    'force sell': {
+        fill: 'FFC7CE', // Excel Bad fill
+        font: '9C0006'  // Excel Bad font
+    }
 };
 
-const columnMappings = {
-    'drCode': 'Dealer Code',
-    'contractNumber': 'Contract Number',
-    'clientCode': 'Client Code',
-    'clientName': 'Client Name',
-    'counterCode': 'Stock Code',
-    'counterName': 'Stock Name',
-    'tradedCurrency': 'Traded Currency',
-    'quantity': 'Quantity',
-    'tradedPrice': 'Price (USD)',
-    'netAmountTradedCcy': 'Total Amount (USD)',
-    'netAmountBaseCcy': 'Total Amount (RM)',
-    'exchangeRate': 'FX Rate'
+const ACTION_SORT_ORDER = {
+    'force sell': 0,
+    'due today': 1,
+    'undue': 2
 };
 
-const requiredColumns = Object.keys(columnMappings);
+const QUANTITY_FORMAT = '#,##0';
+const CONTRACT_VALUE_FORMAT = '#,##0.00';
+
+function normalizeAction(actionValue) {
+    if (actionValue == null) return '';
+    return actionValue.toString().trim().toLowerCase();
+}
+
+function getActionStyle(actionValue) {
+    return ACTION_STYLES[normalizeAction(actionValue)] || null;
+}
+
+function getActionSortRank(actionValue) {
+    const rank = ACTION_SORT_ORDER[normalizeAction(actionValue)];
+    return rank === undefined ? 99 : rank;
+}
+
+function getOutputFileName(fileIndex, total) {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(now.getFullYear());
+    const base = `Cross-Border Trade ${dd}${mm}${yyyy}`;
+    return total > 1 ? `${base}_${fileIndex + 1}.xlsx` : `${base}.xlsx`;
+}
 
 const allowedDealerCodes = [
     'CC', 'CC1', 'CC2', 'CC6', 'CCD', 'CCD1', 'CD3', 'CD5', 'CD6', 'CD9', 'CEA', 'CEZ',
@@ -186,8 +210,8 @@ function processNextFile() {
             // Filter for CNPG contract numbers, specific dealer codes and rename columns
             const filteredData = jsonData
                 .filter(row => {
-                    const contractNum = row[excelColumnNames.contractNumber];
-                    const drCode = row[excelColumnNames.drCode];
+                    const contractNum = row['Cnt No'];
+                    const drCode = row['DR code'];
 
                     if (contractNum &&
                         contractNum.toString().startsWith('CNPG') &&
@@ -201,49 +225,73 @@ function processNextFile() {
                 })
                 .map(row => {
                     const filteredRow = {};
-                    requiredColumns.forEach(oldCol => {
-                        const excelColName = excelColumnNames[oldCol];
-                        if (row.hasOwnProperty(excelColName)) {
-                            filteredRow[columnMappings[oldCol]] = row[excelColName];
+                    columnMappings.forEach(({ source, output }) => {
+                        if (!row.hasOwnProperty(source)) return;
+
+                        let value = row[source];
+                        if (output === 'Quantity' && value != null && value !== '') {
+                            value = Math.round(Number(value));
+                        } else if (output === 'Contract Value' && value != null && value !== '') {
+                            value = Number(value);
                         }
+                        filteredRow[output] = value;
                     });
                     return filteredRow;
                 });
 
-            // Sort by Contract Number
+            // Sort: Force sell → Due today → Undue, then by Contract No.
             filteredData.sort((a, b) => {
-                if (a['Contract Number'] < b['Contract Number']) return -1;
-                if (a['Contract Number'] > b['Contract Number']) return 1;
+                const actionDiff = getActionSortRank(a['Action']) - getActionSortRank(b['Action']);
+                if (actionDiff !== 0) return actionDiff;
+                if (a['Contract No.'] < b['Contract No.']) return -1;
+                if (a['Contract No.'] > b['Contract No.']) return 1;
                 return 0;
             });
 
-            // Create new workbook with filtered data
+            // Create new workbook with filtered data (header order follows columnMappings)
             const newWorkbook = XLSX.utils.book_new();
-            const newWorksheet = XLSX.utils.json_to_sheet(filteredData);
+            const outputHeaders = columnMappings.map(({ output }) => output);
+            const newWorksheet = XLSX.utils.json_to_sheet(filteredData, { header: outputHeaders });
 
-            // Add borders to all cells and bold headers
+            const quantityCol = outputHeaders.indexOf('Quantity');
+            const contractValueCol = outputHeaders.indexOf('Contract Value');
+            const actionCol = outputHeaders.indexOf('Action');
+
+            // Number formats, Action highlights, and bold headers (no borders)
             const range = XLSX.utils.decode_range(newWorksheet['!ref']);
             for (let R = range.s.r; R <= range.e.r; ++R) {
                 for (let C = range.s.c; C <= range.e.c; ++C) {
                     const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
                     if (!newWorksheet[cell_address]) continue;
 
-                    // Style object for the cell
-                    const cellStyle = {
-                        border: {
-                            top: { style: 'thin', color: { rgb: "000000" } },
-                            bottom: { style: 'thin', color: { rgb: "000000" } },
-                            left: { style: 'thin', color: { rgb: "000000" } },
-                            right: { style: 'thin', color: { rgb: "000000" } }
-                        }
-                    };
+                    const cellStyle = {};
 
-                    // Bold headers (first row)
                     if (R === 0) {
                         cellStyle.font = { bold: true };
+                    } else {
+                        if (C === quantityCol) {
+                            newWorksheet[cell_address].z = QUANTITY_FORMAT;
+                            cellStyle.numFmt = QUANTITY_FORMAT;
+                        } else if (C === contractValueCol) {
+                            newWorksheet[cell_address].z = CONTRACT_VALUE_FORMAT;
+                            cellStyle.numFmt = CONTRACT_VALUE_FORMAT;
+                        } else if (C === actionCol) {
+                            const actionStyle = getActionStyle(newWorksheet[cell_address].v);
+                            if (actionStyle) {
+                                cellStyle.fill = {
+                                    patternType: 'solid',
+                                    fgColor: { rgb: actionStyle.fill }
+                                };
+                                if (actionStyle.font) {
+                                    cellStyle.font = { color: { rgb: actionStyle.font } };
+                                }
+                            }
+                        }
                     }
 
-                    newWorksheet[cell_address].s = cellStyle;
+                    if (Object.keys(cellStyle).length) {
+                        newWorksheet[cell_address].s = cellStyle;
+                    }
                 }
             }
 
@@ -265,10 +313,7 @@ function processNextFile() {
 
             XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Filtered Data');
 
-            // Modified file name to include iteration number if multiple files
-            const outputFileName = totalFiles > 1
-                ? `processed_data_${currentFileIndex + 1}.xlsx`
-                : 'processed_data.xlsx';
+            const outputFileName = getOutputFileName(currentFileIndex, totalFiles);
 
             XLSX.writeFile(newWorkbook, outputFileName);
 
