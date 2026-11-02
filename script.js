@@ -121,7 +121,7 @@ function getOutputFileName(fileIndex, total) {
 const allowedDealerCodes = [
     'CC', 'CC1', 'CC2', 'CC6', 'CCD', 'CCD1', 'CD3', 'CD5', 'CD6', 'CD9', 'CEA', 'CEZ',
     'CE1', 'CE0', 'CE11', 'CPI', 'CSK', 'CSY', 'CSW', 'CSW5', 'CD2', 'CSM', 'CD12', 'DMU',
-    'DMW', 'DMJ', 'DMC', 'DME', 'CSR1', 'CSW3', 'DMF', 'DMG', 'DMH', 'DMK', 'CE12', 'CT12', 'CT3', 'DMS'
+    'DMW', 'DMJ', 'DMC', 'DME', 'CSR1', 'CSW3', 'DMF', 'DMG', 'DMH', 'DMK', 'CE12', 'CT12', 'CT3', 'DMS', 'S77', 'S77A'
 ];
 
 let currentFileIndex = 0;
