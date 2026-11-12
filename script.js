@@ -64,15 +64,15 @@ function showStatus(message, type = '') {
 const columnMappings = [
     { source: 'DR code', output: 'DR Code' },
     { source: 'Cnt No', output: 'Contract No.' },
-    { source: 'Action', output: 'Action' },
     { source: 'Name', output: 'Client Name' },
     { source: 'Code', output: 'Client Code' },
     { source: 'Counter', output: 'Counter' },
     { source: 'Qty', output: 'Quantity' },
     { source: 'Buy Price', output: 'Price' },
     { source: 'CCY', output: 'Traded Currency' },
+    { source: 'CCY (Sett)', output: 'Settlement Currency' },
     { source: 'Amount (traded)', output: 'Contract Value' },
-    { source: 'CCY (Sett)', output: 'Settlement Currency' }
+    { source: 'Action', output: 'Action' }
 ];
 
 const ACTION_STYLES = {

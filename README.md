@@ -45,9 +45,9 @@ Matching rows are sorted by Contract No. A dealer-code count summary is shown af
 | Qty | Quantity |
 | Buy Price | Price |
 | CCY | Traded Currency |
-| Amount (traded) | Contract Value |
 | CCY (Sett) | Settlement Currency |
-| Acc int | Interest |
+| Amount (traded) | Contract Value |
+| Action | Action |
 
 Output column order matches the table above.
 
